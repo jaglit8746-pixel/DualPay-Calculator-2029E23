@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DualPay Calculator Pro</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-color: #f8f4ff; /* Светла лавандула */
+            --accent-color: #3d1c02; /* Тъмен шоколад */
+            --glass-bg: rgba(255, 255, 255, 0.75);
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 2.5rem;
+            box-shadow: 0 30px 60px -12px rgba(61, 28, 2, 0.15), 0 18px 36px -18px rgba(0, 0, 0, 0.2);
+        }
+
+        .font-comfortaa { font-family: 'Comfortaa', cursive; }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0; left: 0; z-index: -1;
+        }
+
+        /* Анимиран бутон за изтегляне */
+        .download-btn {
+            background: var(--accent-color);
+            box-shadow: 0 10px 20px -5px rgba(61, 28, 2, 0.4);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .download-btn:hover { transform: translateY(-3px); box-shadow: 0 15px 25px -5px rgba(61, 28, 2, 0.5); }
+        .download-btn:active { transform: scale(0.95); }
+
+        .input-box {
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            background: #fff;
+        }
+        .input-box:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 15px rgba(61, 28, 2, 0.1);
+            outline: none;
+        }
+
+        .hidden-result { opacity: 0; transform: translateY(20px); pointer-events: none; }
+        .show-result { opacity: 1; transform: translateY(0); transition: all 0.6s ease-out; }
+
+        #install-pwa { display: none; } /* Показва се само ако PWA е налично */
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Header Actions -->
+    <div class="fixed top-6 flex gap-4 z-10">
+        <button id="download-file" class="download-btn text-white px-6 py-3 rounded-full flex items-center gap-2 font-comfortaa font-bold text-sm">
+            <svg xmlns="http://www.w3.org" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="Status 4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Изтегли Приложението (.html)
+        </button>
+        <button id="install-pwa" class="bg-white text-[#3d1c02] border-2 border-[#3d1c02] px-6 py-3 rounded-full font-comfortaa font-bold text-sm">
+            Инсталирай на телефон
+        </button>
+    </div>
+
+    <main class="w-full max-w-md p-6 mt-16">
+        <div class="glass-card p-10 relative">
+            <!-- Logo -->
+            <div class="flex flex-col items-center mb-8">
+                <div class="w-20 h-20 bg-[#3d1c02] rounded-[2rem] flex items-center justify-center shadow-lg mb-4 rotate-3">
+                    <span class="text-white text-3xl font-bold font-comfortaa">€⇄лв</span>
+                </div>
+                <h1 class="text-3xl font-bold text-[#3d1c02] font-comfortaa tracking-tight">DualPay Pro</h1>
+            </div>
+
+            <!-- Inputs -->
+            <div class="space-y-5">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase ml-2 mb-2 block">Сума за плащане</label>
+                    <div class="flex gap-2">
+                        <input type="number" id="bill" class="input-box w-full p-4 rounded-2xl text-xl font-semibold" placeholder="0.00">
+                        <select id="bill-curr" class="input-box p-4 rounded-2xl font-bold bg-gray-50">
+                            <option value="BGN">лв</option>
+                            <option value="EUR">€</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase ml-2 mb-1 block">Платено в BGN</label>
+                        <input type="number" id="p-bgn" class="input-box w-full p-4 rounded-2xl font-semibold" placeholder="0.00">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 uppercase ml-2 mb-1 block">Платено в EUR</label>
+                        <input type="number" id="p-eur" class="input-box w-full p-4 rounded-2xl font-semibold" placeholder="0.00">
+                    </div>
+                </div>
+
+                <div id="err" class="hidden animate-pulse bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100 text-center">
+                    ⚠️ Сумата не е достатъчна!
+                </div>
+
+                <!-- Result -->
+                <div id="res-box" class="hidden-result mt-4 pt-6 border-t-2 border-dashed border-gray-200">
+                    <p class="text-center text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Ресто</p>
+                    <div class="flex bg-gray-100/50 p-1.5 rounded-2xl mb-6">
+                        <button onclick="setCurr('BGN')" id="t-bgn" class="flex-1 py-2.5 rounded-xl font-bold transition-all bg-white shadow-md text-[#3d1c02]">Български лев</button>
+                        <button onclick="setCurr('EUR')" id="t-eur" class="flex-1 py-2.5 rounded-xl font-bold transition-all text-gray-500">Евро</button>
+                    </div>
+
+                    <div class="text-center">
+                        <h2 id="main-res" class="text-5xl font-black text-[#3d1c02] mb-2">0.00 лв</h2>
+                        <p id="sec-res" class="text-sm font-medium text-gray-500">еквивалент: 0.00 €</p>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="mt-10 text-center border-t pt-6 border-gray-100">
+                <p class="text-[11px] font-bold text-[#3d1c02]/60 uppercase tracking-widest">Курс: 1 EUR = 1.95583 BGN</p>
+                <p class="text-[10px] text-gray-400 mt-2 font-medium">© [ТВОЕТО ИМЕ] • 2026</p>
+            </footer>
+        </div>
+    </main>
+
+    <script>
+        const RATE = 1.95583;
+        let dCurr = 'BGN';
+
+        // --- BACKGROUND ANIMATION ---
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let symbols = [];
+
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            symbols = [];
+            for(let x=0; x<canvas.width; x+=100) {
+                for(let y=0; y<canvas.height; y+=100) {
+                    symbols.push({
+                        x, y, 
+                        t: (Math.floor(x/100)+Math.floor(y/100))%2===0 ? '€':'лв',
+                        o: Math.random() * Math.PI,
+                        s: 0.7 + Math.random() * 0.5
+                    });
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0,0,canvas.width, canvas.height);
+            ctx.font = '24px Montserrat';
+            ctx.fillStyle = 'rgba(61, 28, 2, 0.05)';
+            symbols.forEach(s => {
+                const dy = Math.sin(Date.now()/2000 + s.o) * 20;
+                ctx.save();
+                ctx.translate(s.x, s.y + dy);
+                ctx.rotate(Math.sin(Date.now()/3000 + s.o) * 0.2);
+                ctx.scale(s.s, s.s);
+                ctx.fillText(s.t, 0, 0);
+                ctx.restore();
+            });
+            requestAnimationFrame(draw);
+        }
+
+        // --- CALCULATION LOGIC ---
+        const fields = ['bill', 'bill-curr', 'p-bgn', 'p-eur'];
+        fields.forEach(f => document.getElementById(f).addEventListener('input', calc));
+
+        function calc() {
+            const b = parseFloat(document.getElementById('bill').value) || 0;
+            const bc = document.getElementById('bill-curr').value;
+            const pb = parseFloat(document.getElementById('p-bgn').value) || 0;
+            const pe = parseFloat(document.getElementById('p-eur').value) || 0;
+
+            const targetBgn = bc === 'EUR' ? b * RATE : b;
+            const paidBgn = pb + (pe * RATE);
+            const diff = paidBgn - targetBgn;
+
+            const resBox = document.getElementById('res-box');
+            const err = document.getElementById('err');
+
+            if (targetBgn > 0 && diff < 0) {
+                err.classList.remove('hidden');
+                resBox.className = 'hidden-result';
+            } else if (targetBgn > 0 && diff >= 0) {
+                err.classList.add('hidden');
+                resBox.className = 'show-result mt-4 pt-6 border-t-2 border-dashed border-gray-200';
+                updateUI(diff);
+            } else {
+                resBox.className = 'hidden-result';
+            }
+        }
+
+        function updateUI(diff) {
+            const main = document.getElementById('main-res');
+            const sec = document.getElementById('sec-res');
+            if (dCurr === 'BGN') {
+                main.innerText = diff.toFixed(2) + ' лв';
+                sec.innerText = `еквивалент: ${(diff/RATE).toFixed(2)} €`;
+            } else {
+                main.innerText = (diff/RATE).toFixed(2) + ' €';
+                sec.innerText = `еквивалент: ${diff.toFixed(2)} лв`;
+            }
+        }
+
+        window.setCurr = (c) => {
+            dCurr = c;
+            document.getElementById('t-bgn').className = c === 'BGN' ? 'flex-1 py-2.5 rounded-xl font-bold transition-all bg-white shadow-md text-[#3d1c02]' : 'flex-1 py-2.5 rounded-xl font-bold transition-all text-gray-500';
+            document.getElementById('t-eur').className = c === 'EUR' ? 'flex-1 py-2.5 rounded-xl font-bold transition-all bg-white shadow-md text-[#3d1c02]' : 'flex-1 py-2.5 rounded-xl font-bold transition-all text-gray-500';
+            calc();
+        };
+
+        // --- DOWNLOAD FUNCTION ---
+        document.getElementById('download-file').addEventListener('click', () => {
+            const htmlContent = document.documentElement.outerHTML;
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'DualPay_Calculator.html';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        });
+
+        // --- PWA & SERVICE WORKER ---
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('install-pwa').style.display = 'block';
+        });
+
+        document.getElementById('install-pwa').addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    document.getElementById('install-pwa').style.display = 'none';
+                }
+                deferredPrompt = null;
+            }
+        });
+
+        // Register Service Worker via Blob
+        const sw = `self.addEventListener('fetch', e => e.respondWith(fetch(e.request)));`;
+        const swBlob = new Blob([sw], {type: 'text/javascript'});
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register(URL.createObjectURL(swBlob));
+        }
+
+        window.addEventListener('resize', init);
+        init(); draw();
+    </script>
+</body>
+</html>
